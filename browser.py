@@ -2,7 +2,7 @@ import sys
 import json
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
-from PyQt5.QtGui import QIcon, QPalette, QColor
+from PyQt5.QtGui import QIcon, QPalette, QColor, QKeySequence
 from PyQt5.QtWebEngineWidgets import *
 from PyQt5.QtWebEngineCore import *
 from datetime import datetime
@@ -29,6 +29,7 @@ class MainWindow(QMainWindow):
 
         navbar = QToolBar()
         self.addToolBar(navbar)
+
         back_btn = QAction(QIcon.fromTheme('go-previous'), 'Zurück', self)
         back_btn.setToolTip('Zurück')
         back_btn.triggered.connect(self.current_browser_back)
@@ -74,6 +75,21 @@ class MainWindow(QMainWindow):
         self.current_browser().loadFinished.connect(self.update_title)
 
         self.update_palette()
+
+        self.setup_shortcuts()
+
+    def setup_shortcuts(self):
+        new_tab_shortcut = QShortcut(QKeySequence('Ctrl+N'), self)
+        new_tab_shortcut.activated.connect(self.add_tab)
+
+        history_shortcut = QShortcut(QKeySequence('Ctrl+H'), self)
+        history_shortcut.activated.connect(self.open_history)
+
+        settings_shortcut = QShortcut(QKeySequence('Ctrl+E'), self)
+        settings_shortcut.activated.connect(self.open_settings)
+
+        bookmark_shortcut = QShortcut(QKeySequence('Ctrl+B'), self)
+        bookmark_shortcut.activated.connect(self.add_bookmark)
 
     def add_tab(self, url=None, label="Neuer Tab"):
         browser = QWebEngineView()
@@ -215,7 +231,7 @@ class MainWindow(QMainWindow):
     def open_settings(self):
         settings_dialog = QDialog(self)
         settings_dialog.setWindowTitle('Einstellungen')
-        settings_dialog.setFixedSize(400, 300)
+        settings_dialog.setFixedSize(500, 400)
 
         layout = QVBoxLayout()
 
@@ -223,12 +239,13 @@ class MainWindow(QMainWindow):
         layout.addWidget(search_engine_label)
 
         self.search_engine_combobox = QComboBox()
-        self.search_engine_combobox.addItems(SEARCH_ENGINES.keys())
+        for engine in SEARCH_ENGINES:
+            self.search_engine_combobox.addItem(engine)
         self.search_engine_combobox.setCurrentText(self.selected_search_engine)
         self.search_engine_combobox.currentIndexChanged.connect(self.change_search_engine)
         layout.addWidget(self.search_engine_combobox)
 
-        mode_toggle = QPushButton('Wechseln zu ' + ('Hellmodus' if self.current_palette == 'dark' else 'Dunkelmodus'))
+        mode_toggle = QPushButton('Hellmodus' if self.current_palette == 'dark' else 'Dunkelmodus')
         mode_toggle.clicked.connect(self.toggle_palette)
         layout.addWidget(mode_toggle)
 
@@ -250,6 +267,14 @@ class MainWindow(QMainWindow):
 
         layout.addLayout(bookmark_layout)
 
+        # Shortcut overview
+        shortcuts_label = QLabel('Tastenkombinationen:')
+        layout.addWidget(shortcuts_label)
+        shortcuts_text = QTextEdit()
+        shortcuts_text.setReadOnly(True)
+        shortcuts_text.setPlainText('Neuer Tab: Strg + N\nVerlauf: Strg + H\nEinstellungen: Strg + E\nLesezeichen hinzufügen: Strg + B')
+        layout.addWidget(shortcuts_text)
+        
         settings_dialog.setLayout(layout)
         settings_dialog.exec_()
 
@@ -336,7 +361,6 @@ class TabBar(QTabBar):
         super().__init__(parent)
         self.setExpanding(False)
         self.setTabsClosable(True)
-        self.setMovable(True)
 
         self.addTabButton = QPushButton('+')
         self.addTabButton.setFixedSize(30, 30)
