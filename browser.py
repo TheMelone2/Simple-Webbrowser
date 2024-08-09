@@ -21,42 +21,41 @@ class MainWindow(QMainWindow):
 
         self.load_settings()
 
-        self.browser = QWebEngineView()
-        self.browser.setUrl(QUrl(self.start_url)) 
-
-        self.setCentralWidget(self.browser)
+        self.tabs = QTabWidget()
+        self.tabs.setTabsClosable(True)
+        self.tabs.setTabBar(TabBar(self))
+        self.tabs.tabCloseRequested.connect(self.close_tab)
+        self.setCentralWidget(self.tabs)
 
         navbar = QToolBar()
         self.addToolBar(navbar)
-
         back_btn = QAction(QIcon.fromTheme('go-previous'), 'Zurück', self)
         back_btn.setToolTip('Zurück')
-        back_btn.triggered.connect(self.browser.back)
+        back_btn.triggered.connect(self.current_browser_back)
         navbar.addAction(back_btn)
 
         forward_btn = QAction(QIcon.fromTheme('go-next'), 'Vorwärts', self)
         forward_btn.setToolTip('Vorwärts')
-        forward_btn.triggered.connect(self.browser.forward)
+        forward_btn.triggered.connect(self.current_browser_forward)
         navbar.addAction(forward_btn)
 
         reload_btn = QAction(QIcon.fromTheme('view-refresh'), 'Neu laden', self)
         reload_btn.setToolTip('Neu laden')
-        reload_btn.triggered.connect(self.browser.reload)
+        reload_btn.triggered.connect(self.current_browser_reload)
         navbar.addAction(reload_btn)
 
         self.url_bar = QLineEdit()
         self.url_bar.returnPressed.connect(self.navigate_to_url)
+        self.url_bar.textChanged.connect(self.update_url_bar)
         navbar.addWidget(self.url_bar)
 
         self.search_engine_menu = QMenu('Suchmaschine', self)
         self.search_engine_btn = navbar.addAction(QIcon.fromTheme('search'), 'Suchmaschine')
         self.search_engine_btn.setMenu(self.search_engine_menu)
-        self.update_search_engine_menu()
 
         self.bookmark_menu = QMenu('Lesezeichen', self)
         self.bookmark_btn = navbar.addAction(QIcon.fromTheme('bookmark-new'), 'Lesezeichen')
         self.bookmark_btn.setMenu(self.bookmark_menu)
-        self.update_bookmark_menu()
 
         history_btn = QAction(QIcon.fromTheme('history'), 'Verlauf', self)
         history_btn.triggered.connect(self.open_history)
@@ -66,39 +65,77 @@ class MainWindow(QMainWindow):
         settings_btn.triggered.connect(self.open_settings)
         navbar.addAction(settings_btn)
 
+        self.add_tab()
+
+        self.update_search_engine_menu()
+        self.update_bookmark_menu()
+
+        self.tabs.currentChanged.connect(self.update_current_tab)
+        self.current_browser().loadFinished.connect(self.update_title)
+
         self.update_palette()
 
-        self.browser.urlChanged.connect(self.update_url_bar)
-        self.browser.loadFinished.connect(self.update_title)
-        self.browser.urlChanged.connect(self.update_history)
+    def add_tab(self, url=None, label="Neuer Tab"):
+        browser = QWebEngineView()
+        browser.setUrl(QUrl(url or self.start_url))
+        index = self.tabs.addTab(browser, label)
+        self.tabs.setCurrentIndex(index)
+        self.update_tab_title()
 
-    def update_search_engine_menu(self):
-        self.search_engine_menu.clear()
-        for engine, url in SEARCH_ENGINES.items():
-            action = QAction(engine, self)
-            action.setCheckable(True)
-            action.setChecked(url == self.start_url)
-            action.triggered.connect(lambda _, url=url: self.set_search_engine(url))
-            self.search_engine_menu.addAction(action)
+    def close_tab(self, index):
+        if self.tabs.count() > 1:
+            self.tabs.removeTab(index)
+        else:
+            QMessageBox.warning(self, 'Warnung', 'Der letzte Tab kann nicht geschlossen werden.')
 
-    def set_search_engine(self, url):
-        self.selected_search_engine = [key for key, value in SEARCH_ENGINES.items() if value == url][0]
-        self.start_url = url
-        self.save_settings()
-        self.browser.setUrl(QUrl(self.start_url))
-        self.update_search_engine_menu()
+    def update_current_tab(self):
+        self.update_url_bar(self.current_browser().url())
+        self.update_tab_title()
+
+    def update_tab_title(self):
+        current_browser = self.current_browser()
+        if current_browser:
+            title = current_browser.page().title()
+            index = self.tabs.currentIndex()
+            self.tabs.setTabText(index, title if title else "Neuer Tab")
+
+    def current_browser(self):
+        index = self.tabs.currentIndex()
+        return self.tabs.widget(index)
+
+    def current_browser_back(self):
+        browser = self.current_browser()
+        if browser:
+            browser.back()
+
+    def current_browser_forward(self):
+        browser = self.current_browser()
+        if browser:
+            browser.forward()
+
+    def current_browser_reload(self):
+        browser = self.current_browser()
+        if browser:
+            browser.reload()
 
     def navigate_to_url(self):
         text = self.url_bar.text()
-        if text.startswith('http://') or text.startswith('https://'):
-            self.browser.setUrl(QUrl(text))
-        else:
-            search_url = f"{self.start_url}/search?q={text}"
-            self.browser.setUrl(QUrl(search_url))
-        self.update_history(self.browser.url())
+        browser = self.current_browser()
+        if browser:
+            if text.startswith('http://') or text.startswith('https://'):
+                browser.setUrl(QUrl(text))
+            else:
+                search_url = f"{self.start_url}/search?q={text}"
+                browser.setUrl(QUrl(search_url))
+            self.update_history(browser.url())
 
-    def update_url_bar(self, q):
-        self.url_bar.setText(q.toString())
+    def update_url_bar(self, url):
+        if self.url_bar.hasFocus():
+            return
+        if isinstance(url, QUrl):
+            self.url_bar.setText(url.toString())
+        else:
+            self.url_bar.setText(url)
 
     def update_history(self, url):
         url_str = url.toString()
@@ -108,7 +145,12 @@ class MainWindow(QMainWindow):
         except FileNotFoundError:
             history = []
 
-        history.append({'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 'url': url_str})
+        is_search = any(url_str.startswith(search_url) for search_url in SEARCH_ENGINES.values())
+        history.append({
+            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'url': url_str,
+            'search': is_search
+        })
 
         with open('history.json', 'w') as file:
             json.dump(history, file, indent=4)
@@ -131,7 +173,7 @@ class MainWindow(QMainWindow):
         history_list = QListWidget()
         history_data = self.load_history()
         for entry in history_data:
-            item_text = f"{entry['timestamp']} - {entry['url']}"
+            item_text = f"{entry['timestamp']} - {entry['url']} (Suchanfrage)" if entry.get('search') else f"{entry['timestamp']} - {entry['url']}"
             history_list.addItem(item_text)
 
         layout.addWidget(history_list)
@@ -140,8 +182,7 @@ class MainWindow(QMainWindow):
         history_dialog.exec_()
 
     def update_title(self):
-        title = self.browser.page().title()
-        self.setWindowTitle(title + ' - Simple Browser')
+        self.update_tab_title()
 
     def update_palette(self):
         palette = QPalette()
@@ -248,8 +289,24 @@ class MainWindow(QMainWindow):
         self.bookmark_menu.clear()
         for bookmark in self.bookmarks:
             action = QAction(bookmark, self)
-            action.triggered.connect(lambda _, url=bookmark: self.browser.setUrl(QUrl(url)))
+            action.triggered.connect(lambda _, url=bookmark: self.current_browser().setUrl(QUrl(url)))
             self.bookmark_menu.addAction(action)
+
+    def update_search_engine_menu(self):
+        self.search_engine_menu.clear()
+        for engine, url in SEARCH_ENGINES.items():
+            action = QAction(engine, self)
+            action.setCheckable(True)
+            action.setChecked(url == self.start_url)
+            action.triggered.connect(lambda _, url=url: self.set_search_engine(url))
+            self.search_engine_menu.addAction(action)
+
+    def set_search_engine(self, url):
+        self.selected_search_engine = [key for key, value in SEARCH_ENGINES.items() if value == url][0]
+        self.start_url = url
+        self.save_settings()
+        self.current_browser().setUrl(QUrl(self.start_url))
+        self.update_search_engine_menu()
 
     def load_settings(self):
         try:
@@ -274,8 +331,36 @@ class MainWindow(QMainWindow):
         with open('settings.json', 'w') as file:
             json.dump(settings, file, indent=4)
 
-app = QApplication(sys.argv)
-QApplication.setApplicationName('Simple Browser')
-window = MainWindow()
-window.show()
-app.exec_()
+class TabBar(QTabBar):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setExpanding(False)
+        self.setTabsClosable(True)
+        self.setMovable(True)
+
+        self.addTabButton = QPushButton('+')
+        self.addTabButton.setFixedSize(30, 30)
+        self.addTabButton.setToolTip('Tab erstellen')
+        self.addTabButton.clicked.connect(self.add_new_tab)
+        self.setTabButton(self.count(), QTabBar.RightSide, self.addTabButton)
+
+    def add_new_tab(self):
+        if self.parent() and isinstance(self.parent(), MainWindow):
+            self.parent().add_tab()
+
+    def tabCloseRequested(self, index):
+        if self.parent() and isinstance(self.parent(), MainWindow):
+            self.parent().close_tab(index)
+
+        if self.count() == 1:
+            self.setTabButton(self.count() - 1, QTabBar.RightSide, None)
+        else:
+            self.setTabButton(self.count() - 1, QTabBar.RightSide, self.addTabButton)
+
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    QApplication.setApplicationName('Simple Browser')
+    window = MainWindow()
+    window.show()
+    app.exec_()
