@@ -1,0 +1,36 @@
+{
+    "en": {
+        "Back": "Back",
+        "Forward": "Forward",
+        "Reload": "Reload",
+        "New Tab": "New Tab",
+        "Bookmarks": "Bookmarks",
+        "History": "History",
+        "Settings": "Settings",
+        "Search Engine": "Search Engine",
+        "Add Bookmark": "Add Bookmark",
+        "Remove Bookmark": "Remove Bookmark",
+        "Light Mode": "Light Mode",
+        "Dark Mode": "Dark Mode",
+        "URL": "URL",
+        "Warning": "Warning",
+        "Last Tab Warning": "Cannot close the last tab."
+    },
+    "de": {
+        "Back": "Zurück",
+        "Forward": "Vorwärts",
+        "Reload": "Neu laden",
+        "New Tab": "Neuer Tab",
+        "Bookmarks": "Lesezeichen",
+        "History": "Verlauf",
+        "Settings": "Einstellungen",
+        "Search Engine": "Suchmaschine",
+        "Add Bookmark": "Lesezeichen hinzufügen",
+        "Remove Bookmark": "Lesezeichen entfernen",
+        "Light Mode": "Heller Modus",
+        "Dark Mode": "Dunkler Modus",
+        "URL": "URL",
+        "Warning": "Warnung",
+        "Last Tab Warning": "Der letzte Tab kann nicht geschlossen werden."
+    }
+}
