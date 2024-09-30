@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Start - Simple Browser</title>
+</head>
+<body>
+    <div class="container">
+        <h1>Simple Browser Startseite</h1>
+        <form action="search.php" method="get">
+            <input type="text" name="q" placeholder="Search..." required>
+            <button type="submit">Search</button>
+        </form>
+        <br>
+        <p>Beispiele: <a href="search.php?q=php">php</a>, <a href="search.php?q=html">html</a>, <a href="search.php?q=css">css</a>, <a href="search.php?q=javascript">javascript</a></p>
+        <br>
+        <p>Simple Browser ist eine einfache Suchmaschine, die es Ihnen ermöglicht, das Web nach Webseiten, Bildern, Videos, Nachrichten und mehr zu durchsuchen.</p>
+        
+        <h2>Themenauswahl</h2>
+        <form id="topic-form">
+            <label for="topic">Themengebiet:</label>
+            <select id="topic">
+                <option value="inland" selected>Inland</option>
+                <option value="ausland">Ausland</option>
+                <option value="wirtschaft">Wirtschaft</option>
+                <option value="sport">Sport</option>
+                <option value="video">Video</option>
+                <option value="investigativ">Investigativ</option>
+                <option value="wissen">Wissen</option>
+            </select>
+        </form>
+
+        <h2>Aktuelles Bundesland: <span id="state"></span></h2>
+        <button id="change-state">Bundesland ändern</button>
+
+        <div id="current_news"></div>
+
+        <script>
+            document.addEventListener("DOMContentLoaded", function() {
+                const stateElement = document.getElementById("state");
+                const topicSelect = document.getElementById("topic");
+                const changeStateBtn = document.getElementById("change-state");
+                const newsContainer = document.getElementById("current_news");
+
+                // API-Endpunkt für Nachrichten (Beispiel, du kannst es durch einen echten ersetzen)
+                const newsAPI = 'https://www.tagesschau.de/api2u/news/';
+
+                // Funktion, um Nachrichten basierend auf dem Thema und Bundesland anzuzeigen
+                async function fetchNews(bundesland, topic) {
+                    try {
+                        const response = await fetch(`${newsAPI}?regions=${bundesland}&ressort=${topic}`);
+                        const newsData = await response.json();
+
+                        displayNews(newsData);
+                    } catch (error) {
+                        console.error("Fehler beim Abrufen der Nachrichten:", error);
+                        newsContainer.innerHTML = "<p>Fehler beim Laden der Nachrichten. Bitte versuchen Sie es später erneut.</p>";
+                    }
+                }
+
+                // Funktion, um die Nachrichten anzuzeigen
+                function displayNews(newsData) {
+                    newsContainer.innerHTML = "";  // Zuvor geladene Nachrichten entfernen
+
+                    if (newsData && newsData.articles && newsData.articles.length > 0) {
+                        newsData.articles.forEach(article => {
+                            const newsItem = document.createElement("div");
+                            newsItem.classList.add("news-item");
+
+                            const title = document.createElement("h3");
+                            title.textContent = article.title;
+
+                            const description = document.createElement("p");
+                            description.textContent = article.description;
+
+                            const link = document.createElement("a");
+                            link.href = article.url;
+                            link.textContent = "Mehr lesen";
+                            link.target = "_blank";
+
+                            newsItem.appendChild(title);
+                            newsItem.appendChild(description);
+                            newsItem.appendChild(link);
+
+                            newsContainer.appendChild(newsItem);
+                        });
+                    } else {
+                        newsContainer.innerHTML = "<p>Keine Nachrichten verfügbar.</p>";
+                    }
+                }
+
+                // Holen der IP-Adresse des Nutzers und Abrufen des Bundeslandes
+                async function getUserLocation() {
+                    try {
+                        const response = await fetch('https://ipapi.co/json/');
+                        const data = await response.json();
+                        const bundesland = mapIPToRegion(data.region_code);
+                        stateElement.textContent = bundesland;
+
+                        // Nachrichten für das Standardthema "Inland" und Bundesland laden
+                        fetchNews(bundesland, "inland");
+                    } catch (error) {
+                        console.error("Fehler beim Abrufen der IP-Adresse:", error);
+                    }
+                }
+
+                // Dummy Funktion, die anhand eines region_code ein Bundesland auswählt
+                function mapIPToRegion(regionCode) {
+                    const regionMapping = {
+                        "BW": 1, // Baden-Württemberg
+                        "BY": 2, // Bayern
+                        "BE": 3, // Berlin
+                        "BB": 4, // Brandenburg
+                        "HB": 5, // Bremen
+                        "HH": 6, // Hamburg
+                        "HE": 7, // Hessen
+                        "MV": 8, // Mecklenburg-Vorpommern
+                        "NI": 9, // Niedersachsen
+                        "NW": 10, // Nordrhein-Westfalen
+                        "RP": 11, // Rheinland-Pfalz
+                        "SL": 12, // Saarland
+                        "SN": 13, // Sachsen
+                        "ST": 14, // Sachsen-Anhalt
+                        "SH": 15, // Schleswig-Holstein
+                        "TH": 16  // Thüringen
+                    };
+                    return regionMapping[regionCode] || 1; // Default to Baden-Württemberg
+                }
+
+                // Erlaubt dem Nutzer, das Bundesland zu ändern
+                changeStateBtn.addEventListener("click", function() {
+                    const newState = prompt("Geben Sie Ihr Bundesland ein:");
+                    if (newState) {
+                        stateElement.textContent = newState;
+                        fetchNews(newState, topicSelect.value);  // Neue Nachrichten basierend auf neuem Bundesland und aktuellem Thema laden
+                    }
+                });
+
+                // Abfrage des ausgewählten Themengebiets und Neuladen der Nachrichten
+                topicSelect.addEventListener("change", function() {
+                    const selectedTopic = topicSelect.value;
+                    const bundesland = stateElement.textContent;
+                    fetchNews(bundesland, selectedTopic);  // Nachrichten für das ausgewählte Thema und Bundesland laden
+                });
+
+                // Laden des Standard-Bundeslandes beim Laden der Seite
+                getUserLocation();
+            });
+        </script>
+
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                background-color: #f4f4f4;
+                margin: 0;
+                padding: 0;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+            }
+
+            .container {
+                background-color: white;
+                padding: 20px;
+                border-radius: 10px;
+                box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+                text-align: center;
+                width: 400px;
+            }
+
+            h1 {
+                color: #333;
+            }
+
+            form {
+                margin-bottom: 20px;
+            }
+
+            input[type="text"] {
+                padding: 10px;
+                width: 80%;
+                margin-right: 10px;
+                border: 1px solid #ccc;
+                border-radius: 5px;
+            }
+
+            button {
+                padding: 10px 20px;
+                background-color: #5cb85c;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                cursor: pointer;
+            }
+
+            button:hover {
+                background-color: #4cae4c;
+            }
+
+            select {
+                padding: 10px;
+                margin-top: 10px;
+                width: 100%;
+                border: 1px solid #ccc;
+                border-radius: 5px;
+            }
+
+            #change-state {
+                background-color: #007bff;
+                color: white;
+                margin-top: 10px;
+                padding: 10px 20px;
+                cursor: pointer;
+                border: none;
+                border-radius: 5px;
+            }
+
+            #change-state:hover {
+                background-color: #0056b3;
+            }
+
+            #current_news {
+                margin-top: 20px;
+            }
+
+            .news-item {
+                background-color: #f9f9f9;
+                padding: 15px;
+                margin-bottom: 10px;
+                border: 1px solid #ddd;
+                border-radius: 5px;
+                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            }
+
+            .news-item h3 {
+                margin: 0 0 10px;
+                font-size: 18px;
+                color: #333;
+            }
+
+            .news-item p {
+                margin: 0 0 10px;
+                color: #555;
+            }
+
+            .news-item a {
+                color: #007bff;
+                text-decoration: none;
+            }
+
+            .news-item a:hover {
+                text-decoration: underline;
+            }
+        </style>
+    </div>
+</body>
+</html>
